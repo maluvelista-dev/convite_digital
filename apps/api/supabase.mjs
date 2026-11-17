@@ -8,7 +8,8 @@ export async function handleSupabase(req,env,fetcher=fetch){
  const reply=(status,data)=>({status,data,headers});
  try{
  if(!env.SUPABASE_URL||!env.SUPABASE_SECRET_KEY||!env.ADMIN_PASSWORD)fail('Configure o banco e a senha nas variáveis da Vercel.',503);
- const base=new URL(env.SUPABASE_URL);if(base.protocol!=='https:')fail('Configuração do banco inválida.',503);
+ let base;try{base=new URL(env.SUPABASE_URL.trim());}catch{fail('SUPABASE_URL inválida. Use a Project URL do Supabase.',503);}
+ if(base.protocol!=='https:'||base.pathname!=='/'||base.search||base.hash||base.username||base.password)fail('SUPABASE_URL inválida. Use somente https://identificador.supabase.co.',503);
  const method=req.method;
  const url=new URL(req.url,'https://'+(req.headers.host||'localhost'));
  const route=req.query?.route||url.searchParams.get('route');
@@ -21,11 +22,23 @@ export async function handleSupabase(req,env,fetcher=fetch){
   if(Buffer.byteLength(JSON.stringify(body))>20000)fail('Conteúdo muito grande.',413);
   if(!body||typeof body!=='object'||Array.isArray(body))fail('Dados inválidos.');
  }
- const key=env.SUPABASE_SECRET_KEY;
+ const key=env.SUPABASE_SECRET_KEY.trim();
+ if(key.startsWith('sb_publishable_'))fail('SUPABASE_SECRET_KEY deve conter a chave secret ou service_role, não a publishable.',503);
+ if(key.startsWith('eyJ')){try{const payload=JSON.parse(Buffer.from(key.split('.')[1],'base64url').toString());if(payload.role!=='service_role')fail('SUPABASE_SECRET_KEY deve conter a chave service_role, não a anon.',503);}catch(e){if(e.status)throw e;fail('A chave legada do Supabase está inválida ou incompleta.',503);}}
  const rpc=async(action,data={})=>{
   const response=await fetcher(new URL('/rest/v1/rpc/benicio_api',base),{method:'POST',headers:{'Content-Type':'application/json',apikey:key,...(key.startsWith('sb_secret_')?{}:{Authorization:'Bearer '+key})},body:JSON.stringify({p_action:action,p_data:data}),signal:AbortSignal.timeout(12000)});
-  const result=await response.json();
-  if(!response.ok){if(result.code==='P0001')fail(result.message,[400,401,404,409,429].includes(Number(result.details))?Number(result.details):400);throw new Error('Falha na comunicação com o banco.');}
+  let result;try{result=await response.json();}catch{console.error('Supabase: resposta inesperada',{status:response.status});fail('O Supabase não retornou uma resposta válida. Confira a Project URL e se o projeto está ativo.',503);}
+  if(!response.ok){
+   if(result.code==='P0001')fail(result.message,[400,401,404,409,429].includes(Number(result.details))?Number(result.details):400);
+   const code=typeof result.code==='string'&&/^[A-Z0-9]{4,12}$/.test(result.code)?result.code:'SEM_CODIGO';
+   console.error('Supabase RPC falhou',{status:response.status,code,action});
+   if(response.status===401)fail('O Supabase recusou a chave. Confira se a URL e a chave secret/service_role pertencem ao mesmo projeto e faça Redeploy.',503);
+   if(code==='PGRST202')fail('A função benicio_api não foi encontrada. Execute supabase/schema.sql no mesmo projeto configurado na Vercel.',503);
+   if(code==='42501'||response.status===403)fail('Sem permissão no Supabase. Confira a chave secret/service_role e execute as permissões de supabase/schema.sql.',503);
+   if(code==='42P01'||code==='3F000')fail('As tabelas do convite não foram encontradas. Execute todo o arquivo supabase/schema.sql.',503);
+   if(code==='PGRST002')fail('A API do banco está indisponível. Confira se o projeto Supabase está ativo e tente novamente.',503);
+   fail(`Não foi possível consultar o Supabase (HTTP ${response.status}, código ${code}). Informe esse código para diagnóstico.`,503);
+  }
   return result;
  };
  const scope=hash(env.ADMIN_PASSWORD).toString('hex');

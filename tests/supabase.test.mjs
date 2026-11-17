@@ -25,3 +25,14 @@ test('protege painel, origem e erros privados do banco',async()=>{
  const reserved=await handleSupabase(request('/api/families/'+'a'.repeat(48)+'/reserve','POST',{giftId:'manta'}),env,fetcher);assert.equal(reserved.status,409);
  const unconfigured=await handleSupabase(request('/api/admin'),{},fetcher);assert.equal(unconfigured.status,503);
 });
+test('diagnóstico distingue chave recusada, função ausente e permissões',async()=>{
+ const req=request('/api/rsvp','POST',{name:'Ana',companions:[],noCompanions:true});
+ for(const [status,code,text] of [[401,'','recusou a chave'],[404,'PGRST202','não foi encontrada'],[403,'42501','Sem permissão'],[400,'42P01','tabelas do convite']]){
+  const result=await handleSupabase(req,env,async()=>Response.json({code,message:'detalhes internos privados'},{status}));
+  assert.equal(result.status,503);assert.ok(result.data.error.includes(text));assert.ok(!result.data.error.includes('internos privados'));
+ }
+ let called=false;
+ const result=await handleSupabase(req,{...env,SUPABASE_SECRET_KEY:'sb_publishable_exemplo'},async()=>{called=true;});
+ assert.equal(result.status,503);assert.equal(called,false);
+ assert.equal((await handleSupabase(req,{...env,SUPABASE_URL:'https://project.supabase.co/dashboard'})).status,503);
+});
