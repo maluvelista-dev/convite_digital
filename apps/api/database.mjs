@@ -1,9 +1,9 @@
 import { DatabaseSync } from 'node:sqlite';
-export const weights = { RN:8, P:12, M:35, G:35, XG:12 };
+export const weights = { RN:1, P:4, M:35, G:35, XG:20 };
 export function nextSize(rows) {
   const counts = Object.fromEntries(Object.keys(weights).map(k=>[k,0]));
   for(const row of rows) counts[row.diaper]++;
-  return Object.keys(weights).sort((a,b)=> ((rows.length+1)*weights[b]/102-counts[b])-((rows.length+1)*weights[a]/102-counts[a]))[0];
+  return Object.keys(weights).sort((a,b)=> ((rows.length+1)*weights[b]/95-counts[b])-((rows.length+1)*weights[a]/95-counts[a]))[0];
 }
 export function database(path) {
  const db = new DatabaseSync(path);

@@ -53,8 +53,8 @@ BEGIN
   PERFORM pg_catalog.pg_advisory_xact_lock(741826309);
  END IF;
  IF p_action='rsvp' THEN
-  SELECT size INTO chosen FROM (VALUES('RN',8,0),('P',12,1),('M',35,2),('G',35,3),('XG',12,4)) AS sizes(size,weight,ord)
-  ORDER BY ((SELECT count(*)+1 FROM benicio.families)*weight/102.0-(SELECT count(*) FROM benicio.families WHERE diaper=size)) DESC,ord LIMIT 1;
+  SELECT size INTO chosen FROM (VALUES('RN',1,0),('P',4,1),('M',35,2),('G',35,3),('XG',20,4)) AS sizes(size,weight,ord)
+  ORDER BY ((SELECT count(*)+1 FROM benicio.families)*weight/95.0-(SELECT count(*) FROM benicio.families WHERE diaper=size)) DESC,ord LIMIT 1;
   INSERT INTO benicio.families(id,name,companions,diaper) VALUES(p_data->>'id',p_data->>'name',p_data->'companions',chosen);
   RETURN jsonb_build_object('id',p_data->>'id');
  ELSIF p_action='event' THEN

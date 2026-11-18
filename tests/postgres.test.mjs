@@ -22,9 +22,9 @@ test('PostgreSQL real: permissões, API, distribuição e reservas transacionais
   assert.equal((await call('/api/admin','GET',undefined,cookie,'outra-senha')).status,401);
   assert.equal((await call('/api/admin/event','PUT',{date:'2027-01-20',time:'15:30',location:'Salão da família'},cookie)).status,200);
   for(const name of ['Manta','Toalha'])assert.equal((await call('/api/admin/gifts','POST',{name,image:'https://example.com/manta.jpg',url:'https://example.com',capacity:1},cookie)).status,201);
-  const ids=[];for(let i=0;i<102;i++){const r=await call('/api/rsvp','POST',{name:'Família '+i,companions:i===0?['Bia']:[],noCompanions:i!==0});assert.equal(r.status,201);ids.push(r.data.id);}
-  const counts=await db.query('SELECT diaper,count(*)::integer AS n FROM benicio.families GROUP BY diaper');assert.deepEqual(Object.fromEntries(counts.rows.map(r=>[r.diaper,r.n])),{RN:8,P:12,M:35,G:35,XG:12});
-  const admin=await call('/api/admin','GET',undefined,cookie);assert.equal(admin.status,200);assert.equal(admin.data.families.length,102);const [g,h]=admin.data.gifts;
+  const ids=[];for(let i=0;i<95;i++){const r=await call('/api/rsvp','POST',{name:'Família '+i,companions:i===0?['Bia']:[],noCompanions:i!==0});assert.equal(r.status,201);ids.push(r.data.id);}
+  const counts=await db.query('SELECT diaper,count(*)::integer AS n FROM benicio.families GROUP BY diaper');assert.deepEqual(Object.fromEntries(counts.rows.map(r=>[r.diaper,r.n])),{RN:1,P:4,M:35,G:35,XG:20});
+  const admin=await call('/api/admin','GET',undefined,cookie);assert.equal(admin.status,200);assert.equal(admin.data.families.length,95);const [g,h]=admin.data.gifts;
   assert.equal((await call('/api/families/'+ids[0])).data.event.location,'Salão da família');
   const reserve=(i,id)=>call('/api/families/'+ids[i]+'/reserve','POST',{giftId:id});
   assert.equal((await reserve(0,g.id)).status,200);assert.equal((await reserve(1,g.id)).status,409);

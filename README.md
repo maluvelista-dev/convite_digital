@@ -22,7 +22,7 @@ No painel, cadastre data, horário, endereço e mimos (foto por URL, nome, link 
 
 A arte anexada está em `apps/web/public/convite.jpeg`. Não há convidados, endereço ou produtos fictícios no banco inicial. Os detalhes da festa aparecem após a confirmação.
 
-Os pesos informados (8/12/35/35/12) somam 102. O sistema normaliza por 102 e escolhe a cada confirmação o tamanho com maior déficit em relação à proporção desejada. A unidade é uma família, independentemente do número de acompanhantes. O tamanho já atribuído permanece fixo. Em grupos pequenos, as proporções são aproximadas.
+Os pesos informados (1/4/35/35/20) somam 95. O sistema normaliza por 95 e escolhe a cada confirmação o tamanho com maior déficit em relação à proporção desejada. A unidade é uma família, independentemente do número de acompanhantes. O tamanho já atribuído permanece fixo. Em grupos pequenos, as proporções são aproximadas.
 
 ## Persistência e publicação
 

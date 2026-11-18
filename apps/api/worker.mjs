@@ -47,9 +47,9 @@ export default {async fetch(request,env){
   // Calcula e insere numa única instrução: confirmações simultâneas não leem a mesma contagem.
   await run(`INSERT INTO families(id,name,companions,diaper,created)
     SELECT ?,?,?,size,? FROM (
-      SELECT 'RN' AS size,8 AS weight,0 AS ord UNION ALL SELECT 'P',12,1
-      UNION ALL SELECT 'M',35,2 UNION ALL SELECT 'G',35,3 UNION ALL SELECT 'XG',12,4
-    ) ORDER BY ((SELECT COUNT(*)+1 FROM families)*weight/102.0-(SELECT COUNT(*) FROM families WHERE diaper=size)) DESC,ord LIMIT 1`,id,name,JSON.stringify(companions),new Date().toISOString());
+      SELECT 'RN' AS size,1 AS weight,0 AS ord UNION ALL SELECT 'P',4,1
+      UNION ALL SELECT 'M',35,2 UNION ALL SELECT 'G',35,3 UNION ALL SELECT 'XG',20,4
+    ) ORDER BY ((SELECT COUNT(*)+1 FROM families)*weight/95.0-(SELECT COUNT(*) FROM families WHERE diaper=size)) DESC,ord LIMIT 1`,id,name,JSON.stringify(companions),new Date().toISOString());
   return json(201,{id});
  }
  const match=p.match(/^\/api\/families\/([a-f0-9]{48})(\/reserve)?$/);
