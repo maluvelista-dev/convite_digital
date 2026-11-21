@@ -12,15 +12,17 @@ test('PostgreSQL real: permissões, API, distribuição e reservas transacionais
    await db.exec('SET ROLE '+role);
    await assert.rejects(db.query("SELECT public.benicio_api('admin','{}')"),/permission denied/);
    await assert.rejects(db.query('SELECT * FROM benicio.families'),/permission denied/);
+   await assert.rejects(db.query('SELECT public.benicio_public_event()'),/permission denied/);
    await db.exec('RESET ROLE');
   }
   await db.exec('SET ROLE service_role');
   const env={SUPABASE_URL:'https://test.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_test',ADMIN_PASSWORD:'uma-senha-de-teste'};
-  const fetcher=async(_,opts)=>{const {p_action,p_data}=JSON.parse(opts.body);try{const r=await db.query('SELECT public.benicio_api($1,$2::jsonb) AS data',[p_action,JSON.stringify(p_data)]);return Response.json(r.rows[0].data);}catch(e){return Response.json({code:e.code,message:e.message,details:e.detail},{status:400});}};
+  const fetcher=async(url,opts)=>{const {p_action,p_data}=JSON.parse(opts.body);try{const r=await (String(url).endsWith('/benicio_public_event')?db.query('SELECT public.benicio_public_event() AS data'):db.query('SELECT public.benicio_api($1,$2::jsonb) AS data',[p_action,JSON.stringify(p_data)]));return Response.json(r.rows[0].data);}catch(e){return Response.json({code:e.code,message:e.message,details:e.detail},{status:400});}};
   const call=(url,method='GET',body,cookie,password=env.ADMIN_PASSWORD)=>handleSupabase({url,method,body,headers:{host:'test.example',cookie},socket:{remoteAddress:'127.0.0.1'}},{...env,ADMIN_PASSWORD:password},fetcher);
   const login=await call('/api/login','POST',{password:env.ADMIN_PASSWORD});assert.equal(login.status,200);const cookie=login.headers['Set-Cookie'].split(';')[0];
   assert.equal((await call('/api/admin','GET',undefined,cookie,'outra-senha')).status,401);
   assert.equal((await call('/api/admin/event','PUT',{date:'2027-01-20',time:'15:30',location:'Salão da família'},cookie)).status,200);
+  const event=await call('/api/event');assert.equal(event.status,200);assert.equal(event.data.event.time,'15:30');assert.deepEqual(Object.keys(event.data),['event']);assert.deepEqual(Object.keys(event.data.event).sort(),['date','location','time']);
   for(const name of ['Manta','Toalha'])assert.equal((await call('/api/admin/gifts','POST',{name,image:'https://example.com/manta.jpg',url:'https://example.com',capacity:1},cookie)).status,201);
   const ids=[];for(let i=0;i<95;i++){const r=await call('/api/rsvp','POST',{name:'Família '+i,companions:i===0?['Bia']:[],noCompanions:i!==0});assert.equal(r.status,201);ids.push(r.data.id);}
   const counts=await db.query('SELECT diaper,count(*)::integer AS n FROM benicio.families GROUP BY diaper');assert.deepEqual(Object.fromEntries(counts.rows.map(r=>[r.diaper,r.n])),{RN:1,P:4,M:35,G:35,XG:20});

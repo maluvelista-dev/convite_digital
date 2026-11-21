@@ -32,6 +32,7 @@ const server=http.createServer(async(req,res)=>{
  if(p==='/api/admin/gifts'&&req.method==='POST'){const name=str(body.name),image=safeUrl(str(body.image,2000)),link=safeUrl(str(body.url,2000));if(!Number.isInteger(body.capacity)||body.capacity<1||body.capacity>10000)fail('Limite inválido.');db.prepare('INSERT INTO gifts VALUES(?,?,?,?,?)').run(randomUUID(),name,image,link,body.capacity);return json(res,201,{ok:true});}
  if(p.startsWith('/api/admin/gifts/')&&req.method==='DELETE'){const id=p.split('/').pop();if(db.prepare('SELECT 1 FROM reservations WHERE gift_id=?').get(id))fail('Este mimo já tem reservas.');db.prepare('DELETE FROM gifts WHERE id=?').run(id);return json(res,200,{ok:true});}
  }
+ if(p==='/api/event'&&req.method==='GET')return json(res,200,{event:db.prepare('SELECT date,time,location FROM settings WHERE id=1').get()});
  if(p==='/api/rsvp'&&req.method==='POST'){
  const name=str(body.name);if(typeof body.noCompanions!=='boolean'||!Array.isArray(body.companions)||body.companions.length>20)fail('Informe os acompanhantes.');
  const companions=body.companions.map(n=>str(n));if(body.noCompanions&&companions.length||!body.noCompanions&&!companions.length)fail('Informe os acompanhantes ou marque que não tem.');

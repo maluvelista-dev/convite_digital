@@ -5,7 +5,21 @@ function notify(message){const n=document.querySelector('#notice');n.textContent
 async function api(path,method='GET',data){const res=await fetch('/api'+path,{method,headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const result=await res.json();if(!res.ok)throw Object.assign(new Error(result.error),{status:res.status});return result;}
 function action(form,fn){form.addEventListener('submit',async e=>{e.preventDefault();form.classList.add('busy');try{await fn(new FormData(form));}catch(e){notify(e.message);}finally{form.classList.remove('busy');}});}
 function header(){return `<span class="star" aria-hidden="true">✦</span><p class="eyebrow">Um pequeno grande amor</p><h2>Chá de bebê do</h2><h1>Benício</h1><p class="intro">Um novo amor está a caminho e queremos compartilhar esse momento especial com você!</p>`;}
-function invitation(){app.innerHTML=`<div class="invite">${header()}<section class="panel"><h2>Você faz parte dessa história</h2><p class="lead">Confirme a sua presença e de seus acompanhantes!</p><form id="rsvp"><label for="name">Seu nome completo</label><input id="name" name="name" autocomplete="name" placeholder="Como podemos chamar você?" required maxlength="120"><div id="companions"><label>Nome dos acompanhantes</label><div id="rows"></div><button type="button" class="secondary small" id="add">+ Adicionar acompanhante</button></div><label class="check"><input type="checkbox" id="alone"> Não tenho acompanhantes</label><button class="submit" type="submit">Confirmar presença ♡</button></form></section><p class="foot">Com carinho, à espera do nosso Benício ♡</p></div>`;
+async function loadEvent(){
+ const container=document.querySelector('#event-info');
+ try{
+  const {event}=await api('/event');
+  if(document.querySelector('#event-info')!==container)return;
+  const date=event.date?new Intl.DateTimeFormat('pt-BR',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(event.date+'T12:00:00Z')):'Data a confirmar';
+  container.innerHTML='<div class="details"><div class="detail"><small>Quando</small>'+esc(date)+(event.time?' · '+esc(event.time):'')+'</div><div class="detail"><small>Onde</small>'+esc(event.location||'O local será informado em breve.')+'</div></div>';
+ }catch(e){
+  if(document.querySelector('#event-info')!==container)return;
+  container.innerHTML='<p class="error">Não foi possível carregar os dados da festa.</p><button type="button" class="secondary small" id="retry-event">Tentar novamente</button>';
+  container.querySelector('#retry-event').onclick=loadEvent;
+ }
+}
+function invitation(){app.innerHTML=`<div class="invite">${header()}<section class="panel" aria-labelledby="event-heading"><h2 id="event-heading">Nosso encontro</h2><div id="event-info" aria-live="polite"><p class="lead">Carregando os dados da festa...</p></div></section><section class="panel"><h2>Você faz parte dessa história</h2><p class="lead">Confirme a sua presença e de seus acompanhantes!</p><form id="rsvp"><label for="name">Seu nome completo</label><input id="name" name="name" autocomplete="name" placeholder="Como podemos chamar você?" required maxlength="120"><div id="companions"><label>Nome dos acompanhantes</label><div id="rows"></div><button type="button" class="secondary small" id="add">+ Adicionar acompanhante</button></div><label class="check"><input type="checkbox" id="alone"> Não tenho acompanhantes</label><button class="submit" type="submit">Confirmar presença ♡</button></form></section><p class="foot">Com carinho, à espera do nosso Benício ♡</p></div>`;
+loadEvent();
 const rows=document.querySelector('#rows');
 const add=()=>{const row=document.createElement('div');row.className='companion-row';row.innerHTML='<input name="companion" aria-label="Nome do acompanhante" placeholder="Nome do acompanhante" required maxlength="120"><button type="button" class="secondary small" aria-label="Remover acompanhante">×</button>';row.querySelector('button').onclick=()=>{row.remove();if(!rows.children.length)add();};rows.append(row);};add();document.querySelector('#add').onclick=()=>{if(rows.children.length<20)add();};
 document.querySelector('#alone').onchange=e=>{document.querySelector('#companions').hidden=e.target.checked;rows.querySelectorAll('input').forEach(i=>i.disabled=e.target.checked);};

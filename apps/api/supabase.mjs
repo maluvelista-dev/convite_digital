@@ -25,15 +25,15 @@ export async function handleSupabase(req,env,fetcher=fetch){
  const key=env.SUPABASE_SECRET_KEY.trim();
  if(key.startsWith('sb_publishable_'))fail('SUPABASE_SECRET_KEY deve conter a chave secret ou service_role, não a publishable.',503);
  if(key.startsWith('eyJ')){try{const payload=JSON.parse(Buffer.from(key.split('.')[1],'base64url').toString());if(payload.role!=='service_role')fail('SUPABASE_SECRET_KEY deve conter a chave service_role, não a anon.',503);}catch(e){if(e.status)throw e;fail('A chave legada do Supabase está inválida ou incompleta.',503);}}
- const rpc=async(action,data={})=>{
-  const response=await fetcher(new URL('/rest/v1/rpc/benicio_api',base),{method:'POST',headers:{'Content-Type':'application/json',apikey:key,...(key.startsWith('sb_secret_')?{}:{Authorization:'Bearer '+key})},body:JSON.stringify({p_action:action,p_data:data}),signal:AbortSignal.timeout(12000)});
+ const rpc=async(action,data={},publicEvent=false)=>{
+  const response=await fetcher(new URL('/rest/v1/rpc/'+(publicEvent?'benicio_public_event':'benicio_api'),base),{method:'POST',headers:{'Content-Type':'application/json',apikey:key,...(key.startsWith('sb_secret_')?{}:{Authorization:'Bearer '+key})},body:JSON.stringify(publicEvent?{}:{p_action:action,p_data:data}),signal:AbortSignal.timeout(12000)});
   let result;try{result=await response.json();}catch{console.error('Supabase: resposta inesperada',{status:response.status});fail('O Supabase não retornou uma resposta válida. Confira a Project URL e se o projeto está ativo.',503);}
   if(!response.ok){
    if(result.code==='P0001')fail(result.message,[400,401,404,409,429].includes(Number(result.details))?Number(result.details):400);
    const code=typeof result.code==='string'&&/^[A-Z0-9]{4,12}$/.test(result.code)?result.code:'SEM_CODIGO';
    console.error('Supabase RPC falhou',{status:response.status,code,action});
    if(response.status===401)fail('O Supabase recusou a chave. Confira se a URL e a chave secret/service_role pertencem ao mesmo projeto e faça Redeploy.',503);
-   if(code==='PGRST202')fail('A função benicio_api não foi encontrada. Execute supabase/schema.sql no mesmo projeto configurado na Vercel.',503);
+   if(code==='PGRST202')fail(publicEvent?'Execute supabase/evento-publico.sql para disponibilizar os dados da festa.':'A função benicio_api não foi encontrada. Execute supabase/schema.sql no mesmo projeto configurado na Vercel.',503);
    if(code==='42501'||response.status===403)fail('Sem permissão no Supabase. Confira a chave secret/service_role e execute as permissões de supabase/schema.sql.',503);
    if(code==='42P01'||code==='3F000')fail('As tabelas do convite não foram encontradas. Execute todo o arquivo supabase/schema.sql.',503);
    if(code==='PGRST002')fail('A API do banco está indisponível. Confira se o projeto Supabase está ativo e tente novamente.',503);
@@ -66,6 +66,7 @@ export async function handleSupabase(req,env,fetcher=fetch){
   return reply(201,await rpc('gift_add',{...auth,id:crypto.randomUUID(),name:str(body.name),image:safeUrl(body.image),url:safeUrl(body.url),capacity:body.capacity}));
  }
  if(p.startsWith('/api/admin/gifts/')&&method==='DELETE')return reply(200,await rpc('gift_delete',{...auth,id:str(p.split('/').pop())}));
+ if(p==='/api/event'&&method==='GET')return reply(200,await rpc('',{},true));
  if(p==='/api/rsvp'&&method==='POST'){
   const name=str(body.name);if(typeof body.noCompanions!=='boolean'||!Array.isArray(body.companions)||body.companions.length>20)fail('Informe os acompanhantes.');
   const companions=body.companions.map(n=>str(n));if(body.noCompanions&&companions.length||!body.noCompanions&&!companions.length)fail('Informe os acompanhantes ou marque que não tem.');

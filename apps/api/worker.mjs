@@ -40,6 +40,7 @@ export default {async fetch(request,env){
   if(p==='/api/admin/gifts'&&method==='POST'){if(!Number.isInteger(body.capacity)||body.capacity<1||body.capacity>10000)fail('Limite inválido.');await run('INSERT INTO gifts VALUES(?,?,?,?,?)',crypto.randomUUID(),str(body.name),safeUrl(body.image),safeUrl(body.url),body.capacity);return json(201,{ok:true});}
   if(p.startsWith('/api/admin/gifts/')&&method==='DELETE'){const id=p.split('/').pop();const result=await run('DELETE FROM gifts WHERE id=? AND NOT EXISTS(SELECT 1 FROM reservations WHERE gift_id=?)',id,id);if(!result.meta.changes&&await first('SELECT 1 FROM gifts WHERE id=?',id))fail('Este mimo já tem reservas.');return json(200,{ok:true});}
  }
+ if(p==='/api/event'&&method==='GET')return json(200,{event:await first('SELECT date,time,location FROM settings WHERE id=1')});
  if(p==='/api/rsvp'&&method==='POST'){
   const name=str(body.name);if(typeof body.noCompanions!=='boolean'||!Array.isArray(body.companions)||body.companions.length>20)fail('Informe os acompanhantes.');
   const companions=body.companions.map(n=>str(n));if(body.noCompanions&&companions.length||!body.noCompanions&&!companions.length)fail('Informe os acompanhantes ou marque que não tem.');
