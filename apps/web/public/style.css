@@ -521,3 +521,6 @@ th {
     transition: none;
   }
 }
+
+
+.gift-pix label{font:12px Arial,sans-serif;margin:14px 0 7px}.gift-pix input{padding:9px 5px;min-height:38px;font-size:13px;text-align:center;letter-spacing:.3px}.gift-pix button{margin-top:14px}

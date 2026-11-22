@@ -16,7 +16,7 @@ export async function handleSupabase(req,env,fetcher=fetch){
  const p=route?'/api/'+(Array.isArray(route)?route.join('/'):route):url.pathname;
  const origin=req.headers.origin;
  if(['POST','PUT','DELETE'].includes(method)&&origin&&new URL(origin).host!==req.headers.host)fail('Origem inválida.',403);
- let body={};if(['POST','PUT'].includes(method)){
+ let body={};if(['POST','PUT','DELETE'].includes(method)){
   if(req.body!==undefined){try{body=typeof req.body==='string'?JSON.parse(req.body):req.body;}catch{fail('Dados inválidos.');}}
   else{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>20000)fail('Conteúdo muito grande.',413);}try{body=JSON.parse(raw||'{}');}catch{fail('Dados inválidos.');}}
   if(Buffer.byteLength(JSON.stringify(body))>20000)fail('Conteúdo muito grande.',413);
@@ -73,7 +73,7 @@ export async function handleSupabase(req,env,fetcher=fetch){
   return reply(201,await rpc('rsvp',{id:randomBytes(24).toString('hex'),name,companions}));
  }
  const match=p.match(/^\/api\/families\/([a-f0-9]{48})(\/reserve)?$/);
- if(match){if(!match[2]&&method==='GET')return reply(200,await rpc('family',{id:match[1]}));
+ if(match){if(match[2]&&method==='DELETE')return reply(200,await rpc('unreserve',{id:match[1],giftId:str(body.giftId)}));if(!match[2]&&method==='GET')return reply(200,await rpc('family',{id:match[1]}));
  if(match[2]&&method==='POST')return reply(200,await rpc('reserve',{id:match[1],giftId:str(body.giftId)}));}
  fail('Não encontrado.',404);
  }catch(e){if(!e.status)console.error('Erro na API Supabase:',e.name);return reply(e.status||503,{error:e.status?e.message:'Não foi possível acessar o banco. Verifique a configuração e tente novamente.'});}

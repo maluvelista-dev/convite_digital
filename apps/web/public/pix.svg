@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+  <rect width="320" height="320" fill="#f0f6f8"/>
+  <circle cx="160" cy="154" r="104" fill="#e1edf2"/>
+  <g fill="none" stroke="#bd9d62" stroke-width="3" stroke-linecap="round">
+    <path d="M62 91h12m-6-6v12M247 204h12m-6-6v12M240 71h8m-4-4v8"/>
+  </g>
+  <rect x="91" y="142" width="138" height="94" rx="8" fill="#749bb0"/>
+  <rect x="82" y="122" width="156" height="31" rx="7" fill="#527c94"/>
+  <path d="M148 122h24v114h-24z" fill="#d4bd8e"/>
+  <path d="M159 122c-37 0-58-12-51-29 8-19 39-5 51 29Zm2 0c37 0 58-12 51-29-8-19-39-5-51 29Z" fill="#e5d5b1" stroke="#bd9d62" stroke-width="3"/>
+  <text x="160" y="279" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" letter-spacing="4" fill="#527c94">UM CARINHO VIA PIX</text>
+</svg>

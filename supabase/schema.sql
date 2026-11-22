@@ -6,7 +6,10 @@ REVOKE ALL ON SCHEMA benicio FROM PUBLIC,anon,authenticated;
 GRANT USAGE ON SCHEMA benicio TO service_role;
 CREATE TABLE IF NOT EXISTS benicio.families(id text PRIMARY KEY,name text NOT NULL,companions jsonb NOT NULL,diaper text NOT NULL,created timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS benicio.gifts(id text PRIMARY KEY,name text NOT NULL,image text NOT NULL,url text NOT NULL,capacity integer NOT NULL CHECK(capacity>0),created timestamptz NOT NULL DEFAULT now());
-CREATE TABLE IF NOT EXISTS benicio.reservations(family_id text PRIMARY KEY REFERENCES benicio.families(id),gift_id text NOT NULL REFERENCES benicio.gifts(id));
+CREATE TABLE IF NOT EXISTS benicio.reservations(family_id text NOT NULL REFERENCES benicio.families(id),gift_id text NOT NULL REFERENCES benicio.gifts(id),PRIMARY KEY(family_id,gift_id));
+SELECT pg_catalog.pg_advisory_xact_lock(741826309);
+ALTER TABLE benicio.reservations DROP CONSTRAINT IF EXISTS reservations_pkey;
+ALTER TABLE benicio.reservations ADD PRIMARY KEY(family_id,gift_id);
 CREATE INDEX IF NOT EXISTS reservations_gift ON benicio.reservations(gift_id);
 CREATE TABLE IF NOT EXISTS benicio.settings(id integer PRIMARY KEY CHECK(id=1),date text NOT NULL DEFAULT '',time text NOT NULL DEFAULT '',location text NOT NULL DEFAULT '');
 INSERT INTO benicio.settings(id) VALUES(1) ON CONFLICT DO NOTHING;
@@ -48,7 +51,7 @@ BEGIN
    RAISE EXCEPTION 'Entre no painel para continuar.' USING DETAIL='401';
   END IF;
  END IF;
- IF p_action IN ('rsvp','reserve','gift_delete') THEN
+ IF p_action IN ('rsvp','reserve','unreserve','gift_delete') THEN
   -- Serializa essas gravações entre instâncias, dentro da transação da RPC.
   PERFORM pg_catalog.pg_advisory_xact_lock(741826309);
  END IF;
@@ -67,15 +70,19 @@ BEGIN
   IF EXISTS(SELECT 1 FROM benicio.reservations WHERE gift_id=p_data->>'id') THEN RAISE EXCEPTION 'Este mimo já tem reservas.' USING DETAIL='400'; END IF;
   DELETE FROM benicio.gifts WHERE id=p_data->>'id';
   RETURN '{"ok":true}'::jsonb;
- ELSIF p_action IN ('family','reserve') THEN
+ ELSIF p_action IN ('family','reserve','unreserve') THEN
   SELECT * INTO family_row FROM benicio.families WHERE id=p_data->>'id';
   IF NOT FOUND THEN RAISE EXCEPTION 'Confirmação não encontrada.' USING DETAIL='404'; END IF;
+  IF p_action='unreserve' THEN
+   DELETE FROM benicio.reservations WHERE family_id=family_row.id AND gift_id=p_data->>'giftId';
+   RETURN '{"ok":true}'::jsonb;
+  END IF;
   IF p_action='reserve' THEN
    SELECT * INTO gift_row FROM benicio.gifts WHERE id=p_data->>'giftId';
    IF NOT FOUND THEN RAISE EXCEPTION 'Mimo não encontrado.' USING DETAIL='404'; END IF;
    IF EXISTS(SELECT 1 FROM benicio.reservations WHERE family_id=family_row.id AND gift_id=gift_row.id) THEN RETURN '{"ok":true}'::jsonb; END IF;
    IF (SELECT count(*) FROM benicio.reservations WHERE gift_id=gift_row.id)>=gift_row.capacity THEN RAISE EXCEPTION 'Esse mimo acabou de ser reservado. Escolha outro.' USING DETAIL='409'; END IF;
-   INSERT INTO benicio.reservations VALUES(family_row.id,gift_row.id) ON CONFLICT(family_id) DO UPDATE SET gift_id=excluded.gift_id;
+   INSERT INTO benicio.reservations VALUES(family_row.id,gift_row.id) ON CONFLICT(family_id,gift_id) DO NOTHING;
    RETURN '{"ok":true}'::jsonb;
   END IF;
  END IF;
@@ -83,9 +90,9 @@ BEGIN
   SELECT coalesce(jsonb_agg(to_jsonb(g)||jsonb_build_object('reserved',(SELECT count(*) FROM benicio.reservations WHERE gift_id=g.id)) ORDER BY g.created,g.id),'[]'::jsonb) INTO gift_list FROM benicio.gifts g;
   result=jsonb_build_object('gifts',gift_list,'event',(SELECT to_jsonb(s) FROM benicio.settings s WHERE id=1));
   IF p_action='admin' THEN
-   RETURN result||jsonb_build_object('families',(SELECT coalesce(jsonb_agg(to_jsonb(f)||jsonb_build_object('giftId',r.gift_id) ORDER BY f.created DESC),'[]'::jsonb) FROM benicio.families f LEFT JOIN benicio.reservations r ON r.family_id=f.id));
+   RETURN result||jsonb_build_object('families',(SELECT coalesce(jsonb_agg(to_jsonb(f)||jsonb_build_object('giftIds',(SELECT coalesce(jsonb_agg(gift_id ORDER BY gift_id),'[]'::jsonb) FROM benicio.reservations WHERE family_id=f.id)) ORDER BY f.created DESC),'[]'::jsonb) FROM benicio.families f));
   END IF;
-  RETURN result||jsonb_build_object('family',to_jsonb(family_row)||jsonb_build_object('giftId',(SELECT gift_id FROM benicio.reservations WHERE family_id=family_row.id)));
+  RETURN result||jsonb_build_object('family',to_jsonb(family_row)||jsonb_build_object('giftIds',(SELECT coalesce(jsonb_agg(gift_id ORDER BY gift_id),'[]'::jsonb) FROM benicio.reservations WHERE family_id=family_row.id)));
  END IF;
  RAISE EXCEPTION 'Não encontrado.' USING DETAIL='404';
 END;

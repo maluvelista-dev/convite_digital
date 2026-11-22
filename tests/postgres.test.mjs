@@ -31,11 +31,21 @@ test('PostgreSQL real: permissões, API, distribuição e reservas transacionais
   const reserve=(i,id)=>call('/api/families/'+ids[i]+'/reserve','POST',{giftId:id});
   assert.equal((await reserve(0,g.id)).status,200);assert.equal((await reserve(1,g.id)).status,409);
   assert.equal((await reserve(1,h.id)).status,200);assert.equal((await reserve(0,h.id)).status,409);
-  assert.equal((await call('/api/families/'+ids[0])).data.family.giftId,g.id);
+  assert.deepEqual((await call('/api/families/'+ids[0])).data.family.giftIds,[g.id]);
   assert.equal((await reserve(0,g.id)).status,200);
-  assert.equal((await call('/api/admin/gifts/'+g.id,'DELETE',undefined,cookie)).status,400);
+  assert.equal((await call('/api/admin/gifts/'+g.id,'DELETE',{},cookie)).status,400);
+  assert.equal((await call('/api/families/'+ids[1]+'/reserve','DELETE',{giftId:h.id})).status,200);
+  assert.equal((await reserve(0,h.id)).status,200);
+  assert.equal((await reserve(0,h.id)).status,200);
+  assert.deepEqual((await call('/api/families/'+ids[0])).data.family.giftIds.sort(),[g.id,h.id].sort());
+  const multi=await call('/api/admin','GET',undefined,cookie);
+  assert.equal(multi.data.families.length,95);
+  assert.equal(multi.data.gifts.find(x=>x.id===h.id).reserved,1);
+  assert.equal((await call('/api/families/'+ids[0]+'/reserve','DELETE',{giftId:g.id})).status,200);
+  assert.deepEqual((await call('/api/families/'+ids[0])).data.family.giftIds,[h.id]);
+  assert.equal((await reserve(1,g.id)).status,200);
   for(let i=0;i<19;i++)await call('/api/login','POST',{password:'errada'});
   assert.equal((await call('/api/login','POST',{password:env.ADMIN_PASSWORD})).status,429);
-  const a=await call('/api/admin','GET',undefined,cookie);assert.equal(a.data.families.filter(f=>f.giftId).length,2);
+  const a=await call('/api/admin','GET',undefined,cookie);assert.equal(a.data.families.filter(f=>f.giftIds.length).length,2);
  }finally{await db.close();}
 });

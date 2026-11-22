@@ -21,9 +21,9 @@ export default {async fetch(request,env){
  const first=(sql,...values)=>query(sql,...values).first();
  const all=async(sql,...values)=>(await query(sql,...values).all()).results;
  const run=(sql,...values)=>query(sql,...values).run();
- let body={};if(['POST','PUT'].includes(method)){const reader=request.body?.getReader();let size=0;const chunks=[];if(reader){while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>20000){await reader.cancel();fail('Conteúdo muito grande.',413);}chunks.push(value);}}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}try{body=JSON.parse(new TextDecoder().decode(bytes)||'{}');}catch{fail('Dados inválidos.');}}
+ let body={};if(['POST','PUT','DELETE'].includes(method)){const reader=request.body?.getReader();let size=0;const chunks=[];if(reader){while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>20000){await reader.cancel();fail('Conteúdo muito grande.',413);}chunks.push(value);}}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}try{body=JSON.parse(new TextDecoder().decode(bytes)||'{}');}catch{fail('Dados inválidos.');}}
  if(['POST','PUT','DELETE'].includes(method)&&request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)fail('Origem inválida.',403);
- const family=async id=>{const f=await first('SELECT f.*,r.gift_id AS giftId FROM families f LEFT JOIN reservations r ON r.family_id=f.id WHERE f.id=?',id);if(!f)fail('Confirmação não encontrada.',404);return {...f,companions:JSON.parse(f.companions)};};
+ const family=async id=>{const f=await first('SELECT f.*,(SELECT json_group_array(gift_id) FROM reservations WHERE family_id=f.id) AS giftIds FROM families f WHERE f.id=?',id);if(!f)fail('Confirmação não encontrada.',404);return {...f,companions:JSON.parse(f.companions),giftIds:JSON.parse(f.giftIds)};};
  const gifts=()=>all('SELECT g.*,(SELECT COUNT(*) FROM reservations r WHERE r.gift_id=g.id) AS reserved FROM gifts g ORDER BY rowid');
  if(p==='/api/login'&&method==='POST'){
   const now=Date.now();const ip=request.headers.get('CF-Connecting-IP')||'local';
@@ -35,7 +35,7 @@ export default {async fetch(request,env){
  }
  if(p.startsWith('/api/admin')){
   const value=request.headers.get('Cookie')?.match(/(?:^|; )admin=([^;]+)/)?.[1];if(!value||!await first('SELECT 1 FROM sessions WHERE token=? AND expires>?',value,Date.now()))fail('Entre no painel para continuar.',401);
-  if(p==='/api/admin'&&method==='GET'){const rows=await all('SELECT f.*,r.gift_id AS giftId FROM families f LEFT JOIN reservations r ON r.family_id=f.id ORDER BY created DESC');return json(200,{families:rows.map(f=>({...f,companions:JSON.parse(f.companions)})),gifts:await gifts(),event:await first('SELECT * FROM settings')});}
+  if(p==='/api/admin'&&method==='GET'){const rows=await all('SELECT f.*,(SELECT json_group_array(gift_id) FROM reservations WHERE family_id=f.id) AS giftIds FROM families f ORDER BY created DESC');return json(200,{families:rows.map(f=>({...f,companions:JSON.parse(f.companions),giftIds:JSON.parse(f.giftIds)})),gifts:await gifts(),event:await first('SELECT * FROM settings')});}
   if(p==='/api/admin/event'&&method==='PUT'){const date=str(body.date,10),time=str(body.time,5),location=str(body.location,500);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))fail('Data ou horário inválido.');await run('UPDATE settings SET date=?,time=?,location=? WHERE id=1',date,time,location);return json(200,{ok:true});}
   if(p==='/api/admin/gifts'&&method==='POST'){if(!Number.isInteger(body.capacity)||body.capacity<1||body.capacity>10000)fail('Limite inválido.');await run('INSERT INTO gifts VALUES(?,?,?,?,?)',crypto.randomUUID(),str(body.name),safeUrl(body.image),safeUrl(body.url),body.capacity);return json(201,{ok:true});}
   if(p.startsWith('/api/admin/gifts/')&&method==='DELETE'){const id=p.split('/').pop();const result=await run('DELETE FROM gifts WHERE id=? AND NOT EXISTS(SELECT 1 FROM reservations WHERE gift_id=?)',id,id);if(!result.meta.changes&&await first('SELECT 1 FROM gifts WHERE id=?',id))fail('Este mimo já tem reservas.');return json(200,{ok:true});}
@@ -55,15 +55,16 @@ export default {async fetch(request,env){
  }
  const match=p.match(/^\/api\/families\/([a-f0-9]{48})(\/reserve)?$/);
  if(match){const f=await family(match[1]);
+  if(match[2]&&method==='DELETE'){await run('DELETE FROM reservations WHERE family_id=? AND gift_id=?',f.id,str(body.giftId));return json(200,{ok:true});}
   if(!match[2]&&method==='GET')return json(200,{family:f,event:await first('SELECT * FROM settings'),gifts:await gifts()});
   if(match[2]&&method==='POST'){
    const id=str(body.giftId);
-   // Só altera a reserva quando há vaga; a escolha anterior permanece se estiver esgotado.
+   // Adiciona uma reserva sem remover outras escolhas da familia.
    const result=await run(`INSERT INTO reservations(family_id,gift_id)
      SELECT ?,id FROM gifts WHERE id=? AND (
        (SELECT COUNT(*) FROM reservations WHERE gift_id=gifts.id)<capacity
        OR EXISTS(SELECT 1 FROM reservations WHERE family_id=? AND gift_id=gifts.id)
-     ) ON CONFLICT(family_id) DO UPDATE SET gift_id=excluded.gift_id`,f.id,id,f.id);
+     ) ON CONFLICT(family_id,gift_id) DO UPDATE SET gift_id=excluded.gift_id`,f.id,id,f.id);
    if(!result.meta.changes){if(!await first('SELECT 1 FROM gifts WHERE id=?',id))fail('Mimo não encontrado.',404);fail('Esse mimo acabou de ser reservado. Escolha outro.',409);}
    return json(200,{ok:true});
   }

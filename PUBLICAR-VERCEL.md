@@ -39,6 +39,8 @@ Clique em **Deploy**. Se adicionou variáveis depois da primeira publicação, f
 
 ## 5. Conferir e compartilhar
 
+Para atualizar um banco que permitia somente um mimo por família, execute `supabase/multiplos-mimos.sql` no SQL Editor e publique os arquivos atualizados `apps/api/supabase.mjs` e `apps/web/public/app.js`. A migração mantém as reservas existentes e permite reservar vários itens distintos, com cancelamento individual. Não é necessário apagar convidados ou recadastrar os mimos.
+
 Abra o endereço `https://nome-do-projeto.vercel.app` retornado pela Vercel. Acesse `/admin` e entre com `ADMIN_PASSWORD`. Cadastre local, data, horário e mimos. Abra o convite em janela anônima, confirme uma família e teste a reserva. Verifique se ela aparece no painel. A página `/?novo=1` permite voltar ao cadastro.
 
 Em Settings → Deployment Protection, confira se a publicação Production está acessível aos convidados sem conta Vercel. Teste em uma janela anônima ou em outro celular antes de enviar. Compartilhe somente o endereço principal, sem `/admin` nem `?familia=...`.
