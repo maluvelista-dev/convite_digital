@@ -1,1 +1,5 @@
-{"name":"@benicio/api","private":true,"type":"module"}
+{
+  "name": "@benicio/api",
+  "private": true,
+  "type": "module"
+}

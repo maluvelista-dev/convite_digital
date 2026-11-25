@@ -1,38 +1,239 @@
-const app=document.querySelector('#app');
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const app = document.querySelector("#app");
+const esc = (v) =>
+  String(v ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
 let noticeTimer;
-function notify(message){const n=document.querySelector('#notice');n.textContent=message;n.style.display='block';clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>n.style.display='none',5500);}
-async function api(path,method='GET',data){const res=await fetch('/api'+path,{method,headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const result=await res.json();if(!res.ok)throw Object.assign(new Error(result.error),{status:res.status});return result;}
-function action(form,fn){form.addEventListener('submit',async e=>{e.preventDefault();form.classList.add('busy');try{await fn(new FormData(form));}catch(e){notify(e.message);}finally{form.classList.remove('busy');}});}
-function header(){return `<span class="star" aria-hidden="true">✦</span><p class="eyebrow">Um pequeno grande amor</p><h2>Chá de bebê do</h2><h1>Benício</h1><p class="intro">Um novo amor está a caminho e queremos compartilhar esse momento especial com você!</p>`;}
-async function loadEvent(){
- const container=document.querySelector('#event-info');
- try{
-  const {event}=await api('/event');
-  if(document.querySelector('#event-info')!==container)return;
-  const date=event.date?new Intl.DateTimeFormat('pt-BR',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(event.date+'T12:00:00Z')):'Data a confirmar';
-  container.innerHTML='<div class="details"><div class="detail"><small>Quando</small>'+esc(date)+(event.time?' · '+esc(event.time):'')+'</div><div class="detail"><small>Onde</small>'+esc(event.location||'O local será informado em breve.')+'</div></div>';
- }catch(e){
-  if(document.querySelector('#event-info')!==container)return;
-  container.innerHTML='<p class="error">Não foi possível carregar os dados da festa.</p><button type="button" class="secondary small" id="retry-event">Tentar novamente</button>';
-  container.querySelector('#retry-event').onclick=loadEvent;
- }
+function notify(message) {
+  const n = document.querySelector("#notice");
+  n.textContent = message;
+  n.style.display = "block";
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => (n.style.display = "none"), 5500);
 }
-function invitation(){app.innerHTML=`<div class="invite">${header()}<section class="panel" aria-labelledby="event-heading"><h2 id="event-heading">Nosso encontro</h2><div id="event-info" aria-live="polite"><p class="lead">Carregando os dados da festa...</p></div></section><section class="panel"><h2>Você faz parte dessa história</h2><p class="lead">Confirme a sua presença e de seus acompanhantes!</p><form id="rsvp"><label for="name">Seu nome completo</label><input id="name" name="name" autocomplete="name" placeholder="Como podemos chamar você?" required maxlength="120"><div id="companions"><label>Nome dos acompanhantes</label><div id="rows"></div><button type="button" class="secondary small" id="add">+ Adicionar acompanhante</button></div><label class="check"><input type="checkbox" id="alone"> Não tenho acompanhantes</label><button class="submit" type="submit">Confirmar presença ♡</button></form></section><p class="foot">Com carinho, à espera do nosso Benício ♡</p></div>`;
-loadEvent();
-const rows=document.querySelector('#rows');
-const add=()=>{const row=document.createElement('div');row.className='companion-row';row.innerHTML='<input name="companion" aria-label="Nome do acompanhante" placeholder="Nome do acompanhante" required maxlength="120"><button type="button" class="secondary small" aria-label="Remover acompanhante">×</button>';row.querySelector('button').onclick=()=>{row.remove();if(!rows.children.length)add();};rows.append(row);};add();document.querySelector('#add').onclick=()=>{if(rows.children.length<20)add();};
-document.querySelector('#alone').onchange=e=>{document.querySelector('#companions').hidden=e.target.checked;rows.querySelectorAll('input').forEach(i=>i.disabled=e.target.checked);};
-action(document.querySelector('#rsvp'),async data=>{const result=await api('/rsvp','POST',{name:data.get('name'),noCompanions:document.querySelector('#alone').checked,companions:data.getAll('companion')});localStorage.setItem('benicio-family',result.id);history.replaceState(null,'','/?familia='+result.id);await confirmed(result.id);});}
-async function confirmed(id,showGifts=false){try{const {family:f,event,gifts}=await api('/families/'+id);const date=event.date?new Intl.DateTimeFormat('pt-BR',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(event.date+'T12:00:00Z')):'Data a confirmar';
-app.innerHTML=`<div class="invite">${header()}<section class="panel"><p class="eyebrow">Presença confirmada</p><h2>Esperamos você, ${esc(f.name)}!</h2><p class="lead">${f.companions.length?`E também ${f.companions.map(esc).join(', ')}. `:''}Vai ser ainda mais especial com vocês por perto.</p><div class="details"><div class="detail"><small>Quando</small>${esc(date)}${event.time?' · '+esc(event.time):' · Horário a confirmar'}</div><div class="detail"><small>Onde</small>${esc(event.location||'O local será informado em breve.')}</div></div><div class="diaper"><span>Uma sugestão de carinho</span><strong>Fralda ${esc(f.diaper)}</strong><p>Esse é o tamanho sugerido para sua família.<br>Seu carinho é o nosso maior presente!</p></div><button id="show-gifts" type="button" class="submit gift-cta" aria-controls="gift-section" aria-expanded="${showGifts}"><span>Confira algumas sugestões de mimos!</span><span class="gift-cta-arrow" aria-hidden="true">→</span></button><div class="divider"></div><p class="lead">Guarde seu link para consultar o convite e a sua reserva.</p><button id="copy" class="secondary small">Copiar meu link</button><a class="button secondary submit" href="/?novo=1">Voltar ao cadastro</a><p class="lead">Sua confirmação continua salva. Volte ao cadastro para confirmar outra família.</p></section><section class="panel" id="gift-section" ${showGifts?'':'hidden'}><h2>Pequenos mimos, muito amor</h2><p class="lead">Escolha quantos mimos quiser para o Benício. As reservas são opcionais e você pode cancelar cada uma individualmente.</p><div class="gifts"><article class="gift gift-pix"><img src="/pix.svg" alt="Caixa de presente azul com laço dourado" loading="lazy"><div class="gift-content"><h3>Mimo por Pix</h3><p>Presenteie com o valor que desejar.</p><label for="pix-key">Chave Pix · telefone</label><input id="pix-key" type="text" value="+5513985993506" readonly inputmode="tel"><button type="button" id="copy-pix">Copiar chave Pix</button></div></article>${gifts.map(g=>{const selected=(f.giftIds||[]).includes(g.id),full=g.reserved>=g.capacity;return `<article class="gift ${selected?'selected':full?'full':''}"><img src="${esc(g.image)}" alt="${esc(g.name)}" loading="lazy"><div class="gift-content"><h3>${esc(g.name)}</h3><p>${selected?'♡ Reservado por sua família':full?'Todas as unidades reservadas':`${g.capacity-g.reserved} disponível(is)`}</p><a href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">Ver onde comprar ↗</a><button data-gift="${esc(g.id)}" data-reserved="${selected}" ${full&&!selected?'disabled':''}>${selected?'Cancelar reserva':full?'Esgotado':'Reservar mimo'}</button></div></article>`;}).join('')}</div></section><p class="foot">Um pedacinho do céu está chegando ♡</p></div>`;
-document.querySelector('#show-gifts').onclick=()=>{const section=document.querySelector('#gift-section');section.hidden=false;document.querySelector('#show-gifts').setAttribute('aria-expanded','true');section.scrollIntoView({behavior:'smooth',block:'start'});};document.querySelector('#copy').onclick=async()=>{try{await navigator.clipboard.writeText(location.origin+'/?familia='+id);notify('Seu link foi copiado!');}catch{notify('Copie o endereço da barra do navegador.');}};
-document.querySelector('#copy-pix').onclick=async()=>{const input=document.querySelector('#pix-key');try{await navigator.clipboard.writeText(input.value);notify('Chave Pix copiada!');}catch{input.focus();input.select();notify('Selecione e copie a chave Pix acima.');}};
-document.querySelectorAll('[data-gift]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const cancel=b.dataset.reserved==='true';await api('/families/'+id+'/reserve',cancel?'DELETE':'POST',{giftId:b.dataset.gift});await confirmed(id,true);notify(cancel?'Reserva cancelada.':'Mimo reservado com carinho!');}catch(e){await confirmed(id,true);notify(e.message);}});
-}catch(e){if(e.status===404){if(localStorage.getItem('benicio-family')===id)localStorage.removeItem('benicio-family');history.replaceState(null,'','/?novo=1');invitation();notify('Esta confirma\u00e7\u00e3o n\u00e3o existe mais. Voc\u00ea pode preencher o convite novamente.');return;}app.innerHTML=`<div class="invite"><section class="panel"><h2>Não foi possível abrir o convite</h2><p>${esc(e.message)}</p><a class="button" href="/?novo=1">Voltar ao convite</a></section></div>`;}}
-function login(){app.innerHTML=`<div class="admin"><section class="panel login"><p class="eyebrow">Organização da festa</p><h2>Bem-vinda ao chá do Benício</h2><form id="login"><label for="password">Senha administrativa</label><input id="password" name="password" type="password" autocomplete="current-password" required><button class="submit">Entrar no painel</button></form><p class="foot"><a href="/">Voltar para o convite</a></p></section></div>`;action(document.querySelector('#login'),async d=>{await api('/login','POST',{password:d.get('password')});await admin();});}
-async function admin(){let data;try{data=await api('/admin');}catch(e){if(e.status===401)return login();app.innerHTML=`<p class="error">${esc(e.message)}</p>`;return;}const {families,gifts,event}=data;const total=families.reduce((n,f)=>n+1+f.companions.length,0);const reservations=families.reduce((n,f)=>n+(f.giftIds||[]).length,0);
-app.innerHTML=`<div class="admin"><p class="eyebrow">Um novo amor está a caminho</p><h1>Os preparativos do Benício</h1><a href="/" target="_blank">Abrir convite ↗</a><div class="metrics"><div class="metric"><strong>${families.length}</strong>famílias confirmadas</div><div class="metric"><strong>${total}</strong>pessoas esperadas</div><div class="metric"><strong>${reservations}</strong>mimos reservados</div></div><section class="panel"><h2>O link do convite</h2><p>Envie este endereço para seus convidados:</p><div class="linkbox">${esc(location.origin)}/</div></section><div class="admin-grid"><section class="panel"><h2>Nosso encontro</h2><form id="event"><label for="date">Data</label><input id="date" name="date" type="date" value="${esc(event.date)}" required><label for="time">Horário</label><input id="time" name="time" type="time" value="${esc(event.time)}" required><label for="location">Local e endereço</label><input id="location" name="location" value="${esc(event.location)}" maxlength="500" required><button class="submit">Salvar informações</button></form></section><section class="panel"><h2>Cadastrar um mimo</h2><form id="gift"><label for="gift-name">Nome do mimo</label><input id="gift-name" name="name" required maxlength="120"><label for="image">Link da foto</label><input id="image" name="image" type="url" placeholder="https://..." required maxlength="2000"><label for="url">Link para comprar</label><input id="url" name="url" type="url" placeholder="https://..." required maxlength="2000"><label for="capacity">Quantas famílias podem escolher?</label><input id="capacity" name="capacity" type="number" min="1" max="10000" value="1" required><button class="submit">Adicionar mimo</button></form></section></div><section class="panel"><h2>Famílias e confirmações</h2><p class="empty">Fraldas por família: ${['RN','P','M','G','XG'].map(s=>`${s}: ${families.filter(f=>f.diaper===s).length}`).join(' · ')}</p>${families.length?`<div class="table-wrap"><table><thead><tr><th>Convidado</th><th>Acompanhantes</th><th>Fralda</th><th>Mimos escolhidos</th></tr></thead><tbody>${families.map(f=>`<tr><td>${esc(f.name)}</td><td>${f.companions.map(esc).join(', ')||'Sem acompanhantes'}</td><td>${esc(f.diaper)}</td><td>${(f.giftIds||[]).map(id=>esc(gifts.find(g=>g.id===id)?.name||'Mimo')).join(', ')||'Ainda não escolheu'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">As confirmações aparecerão aqui assim que os convidados responderem.</p>'}</section><section class="panel"><h2>Lista de mimos</h2>${gifts.length?gifts.map(g=>`<div class="admin-gift"><div><strong>${esc(g.name)}</strong><p class="empty">${g.reserved} de ${g.capacity} reservado(s)</p></div><button class="secondary small" data-delete="${esc(g.id)}" ${g.reserved?'disabled':''}>Remover</button></div>`).join(''):'<p class="empty">Cadastre os primeiros mimos acima.</p>'}</section></div>`;
-action(document.querySelector('#event'),async d=>{await api('/admin/event','PUT',Object.fromEntries(d));notify('Informações da festa salvas.');});action(document.querySelector('#gift'),async d=>{await api('/admin/gifts','POST',{...Object.fromEntries(d),capacity:Number(d.get('capacity'))});await admin();notify('Mimo adicionado!');});document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{try{await api('/admin/gifts/'+b.dataset.delete,'DELETE');await admin();}catch(e){notify(e.message);}});
+async function api(path, method = "GET", data) {
+  const res = await fetch("/api" + path, {
+    method,
+    headers: data ? { "Content-Type": "application/json" } : {},
+    body: data ? JSON.stringify(data) : undefined,
+  });
+  const result = await res.json();
+  if (!res.ok)
+    throw Object.assign(new Error(result.error), { status: res.status });
+  return result;
 }
-if(location.pathname==='/admin')admin();else{const params=new URLSearchParams(location.search);const id=params.has('novo')?null:params.get('familia')||localStorage.getItem('benicio-family');if(id&&/^[a-f0-9]{48}$/.test(id))confirmed(id);else invitation();}
+function action(form, fn) {
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    form.classList.add("busy");
+    try {
+      await fn(new FormData(form));
+    } catch (e) {
+      notify(e.message);
+    } finally {
+      form.classList.remove("busy");
+    }
+  });
+}
+function header() {
+  return `<span class="star" aria-hidden="true">✦</span><p class="eyebrow">Um pequeno grande amor</p><h2>Chá de bebê do</h2><h1>Benício</h1><p class="intro">Um novo amor está a caminho e queremos compartilhar esse momento especial com você!</p>`;
+}
+async function loadEvent() {
+  const container = document.querySelector("#event-info");
+  try {
+    const { event } = await api("/event");
+    if (document.querySelector("#event-info") !== container) return;
+    const date = event.date
+      ? new Intl.DateTimeFormat("pt-BR", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "UTC",
+        }).format(new Date(event.date + "T12:00:00Z"))
+      : "Data a confirmar";
+    container.innerHTML =
+      '<div class="details"><div class="detail"><small>Quando</small>' +
+      esc(date) +
+      (event.time ? " · " + esc(event.time) : "") +
+      '</div><div class="detail"><small>Onde</small>' +
+      esc(event.location || "O local será informado em breve.") +
+      "</div></div>";
+  } catch (e) {
+    if (document.querySelector("#event-info") !== container) return;
+    container.innerHTML =
+      '<p class="error">Não foi possível carregar os dados da festa.</p><button type="button" class="secondary small" id="retry-event">Tentar novamente</button>';
+    container.querySelector("#retry-event").onclick = loadEvent;
+  }
+}
+function invitation() {
+  app.innerHTML = `<div class="invite">${header()}<section class="panel" aria-labelledby="event-heading"><h2 id="event-heading">Nosso encontro</h2><div id="event-info" aria-live="polite"><p class="lead">Carregando os dados da festa...</p></div></section><section class="panel"><h2>Você faz parte dessa história</h2><p class="lead">Confirme a sua presença e de seus acompanhantes!</p><form id="rsvp"><label for="name">Seu nome completo</label><input id="name" name="name" autocomplete="name" placeholder="Como podemos chamar você?" required maxlength="120"><div id="companions"><label>Nome dos acompanhantes</label><div id="rows"></div><button type="button" class="secondary small" id="add">+ Adicionar acompanhante</button></div><label class="check"><input type="checkbox" id="alone"> Não tenho acompanhantes</label><button class="submit" type="submit">Confirmar presença ♡</button></form></section><p class="foot">Com carinho, à espera do nosso Benício ♡</p></div>`;
+  loadEvent();
+  const rows = document.querySelector("#rows");
+  const add = () => {
+    const row = document.createElement("div");
+    row.className = "companion-row";
+    row.innerHTML =
+      '<input name="companion" aria-label="Nome do acompanhante" placeholder="Nome do acompanhante" required maxlength="120"><button type="button" class="secondary small" aria-label="Remover acompanhante">×</button>';
+    row.querySelector("button").onclick = () => {
+      row.remove();
+      if (!rows.children.length) add();
+    };
+    rows.append(row);
+  };
+  add();
+  document.querySelector("#add").onclick = () => {
+    if (rows.children.length < 20) add();
+  };
+  document.querySelector("#alone").onchange = (e) => {
+    document.querySelector("#companions").hidden = e.target.checked;
+    rows
+      .querySelectorAll("input")
+      .forEach((i) => (i.disabled = e.target.checked));
+  };
+  action(document.querySelector("#rsvp"), async (data) => {
+    const result = await api("/rsvp", "POST", {
+      name: data.get("name"),
+      noCompanions: document.querySelector("#alone").checked,
+      companions: data.getAll("companion"),
+    });
+    localStorage.setItem("benicio-family", result.id);
+    history.replaceState(null, "", "/?familia=" + result.id);
+    await confirmed(result.id);
+  });
+}
+async function confirmed(id) {
+  try {
+    const { family: f, event, gifts } = await api("/families/" + id);
+    const date = event.date
+      ? new Intl.DateTimeFormat("pt-BR", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "UTC",
+        }).format(new Date(event.date + "T12:00:00Z"))
+      : "Data a confirmar";
+    app.innerHTML = `<div class="invite">${header()}<section class="panel"><p class="eyebrow">Presença confirmada</p><h2>Esperamos você, ${esc(f.name)}!</h2><p class="lead">${f.companions.length ? `E também ${f.companions.map(esc).join(", ")}. ` : ""}Vai ser ainda mais especial com vocês por perto.</p><div class="details"><div class="detail"><small>Quando</small>${esc(date)}${event.time ? " · " + esc(event.time) : " · Horário a confirmar"}</div><div class="detail"><small>Onde</small>${esc(event.location || "O local será informado em breve.")}</div></div><div class="diaper"><span>Uma sugestão de carinho</span><strong>Fralda ${esc(f.diaper)}</strong><p>Esse é o tamanho sugerido para sua família.<br>Seu carinho é o nosso maior presente!</p></div></section><section class="panel" id="gift-section"><h2>Pequenos mimos, muito amor</h2><p class="lead">Escolha quantos mimos quiser para o Benício. As reservas são opcionais e você pode cancelar cada uma individualmente.</p><div class="gifts"><article class="gift gift-pix"><img src="/pix.svg" alt="Caixa de presente azul com laço dourado" loading="lazy"><div class="gift-content"><h3>Mimo por Pix</h3><p>Presenteie com o valor que desejar.</p><label for="pix-key">Chave Pix · telefone</label><input id="pix-key" type="text" value="+5513985993506" readonly inputmode="tel"><button type="button" id="copy-pix">Copiar chave Pix</button></div></article>${gifts
+      .map((g) => {
+        const selected = (f.giftIds || []).includes(g.id),
+          full = g.reserved >= g.capacity;
+        return `<article class="gift ${selected ? "selected" : full ? "full" : ""}"><img src="${esc(g.image)}" alt="${esc(g.name)}" loading="lazy"><div class="gift-content"><h3>${esc(g.name)}</h3><p>${selected ? "♡ Reservado por sua família" : full ? "Todas as unidades reservadas" : `${g.capacity - g.reserved} disponível(is)`}</p><a href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">Ver onde comprar ↗</a><button data-gift="${esc(g.id)}" data-reserved="${selected}" ${full && !selected ? "disabled" : ""}>${selected ? "Cancelar reserva" : full ? "Esgotado" : "Reservar mimo"}</button></div></article>`;
+      })
+      .join(
+        "",
+      )}</div></section><section class="panel"><p class="lead">Guarde seu link para consultar o convite e a sua reserva.</p><button id="copy" class="secondary small">Copiar meu link</button><a class="button secondary submit" href="/?novo=1">Voltar ao cadastro</a><p class="lead">Sua confirmação continua salva. Volte ao cadastro para confirmar outra família.</p></section><p class="foot">Um pedacinho do céu está chegando ♡</p></div>`;
+    document.querySelector("#copy").onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(
+          location.origin + "/?familia=" + id,
+        );
+        notify("Seu link foi copiado!");
+      } catch {
+        notify("Copie o endereço da barra do navegador.");
+      }
+    };
+    document.querySelector("#copy-pix").onclick = async () => {
+      const input = document.querySelector("#pix-key");
+      try {
+        await navigator.clipboard.writeText(input.value);
+        notify("Chave Pix copiada!");
+      } catch {
+        input.focus();
+        input.select();
+        notify("Selecione e copie a chave Pix acima.");
+      }
+    };
+    document.querySelectorAll("[data-gift]").forEach(
+      (b) =>
+        (b.onclick = async () => {
+          b.disabled = true;
+          try {
+            const cancel = b.dataset.reserved === "true";
+            await api(
+              "/families/" + id + "/reserve",
+              cancel ? "DELETE" : "POST",
+              { giftId: b.dataset.gift },
+            );
+            await confirmed(id);
+            notify(
+              cancel ? "Reserva cancelada." : "Mimo reservado com carinho!",
+            );
+          } catch (e) {
+            await confirmed(id);
+            notify(e.message);
+          }
+        }),
+    );
+  } catch (e) {
+    if (e.status === 404) {
+      if (localStorage.getItem("benicio-family") === id)
+        localStorage.removeItem("benicio-family");
+      history.replaceState(null, "", "/?novo=1");
+      invitation();
+      notify(
+        "Esta confirma\u00e7\u00e3o n\u00e3o existe mais. Voc\u00ea pode preencher o convite novamente.",
+      );
+      return;
+    }
+    app.innerHTML = `<div class="invite"><section class="panel"><h2>Não foi possível abrir o convite</h2><p>${esc(e.message)}</p><a class="button" href="/?novo=1">Voltar ao convite</a></section></div>`;
+  }
+}
+function login() {
+  app.innerHTML = `<div class="admin"><section class="panel login"><p class="eyebrow">Organização da festa</p><h2>Bem-vinda ao chá do Benício</h2><form id="login"><label for="password">Senha administrativa</label><input id="password" name="password" type="password" autocomplete="current-password" required><button class="submit">Entrar no painel</button></form><p class="foot"><a href="/">Voltar para o convite</a></p></section></div>`;
+  action(document.querySelector("#login"), async (d) => {
+    await api("/login", "POST", { password: d.get("password") });
+    await admin();
+  });
+}
+async function admin() {
+  let data;
+  try {
+    data = await api("/admin");
+  } catch (e) {
+    if (e.status === 401) return login();
+    app.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    return;
+  }
+  const { families, gifts, event } = data;
+  const total = families.reduce((n, f) => n + 1 + f.companions.length, 0);
+  const reservations = families.reduce(
+    (n, f) => n + (f.giftIds || []).length,
+    0,
+  );
+  app.innerHTML = `<div class="admin"><p class="eyebrow">Um novo amor está a caminho</p><h1>Os preparativos do Benício</h1><a href="/" target="_blank">Abrir convite ↗</a><div class="metrics"><div class="metric"><strong>${families.length}</strong>famílias confirmadas</div><div class="metric"><strong>${total}</strong>pessoas esperadas</div><div class="metric"><strong>${reservations}</strong>mimos reservados</div></div><section class="panel"><h2>O link do convite</h2><p>Envie este endereço para seus convidados:</p><div class="linkbox">${esc(location.origin)}/</div></section><div class="admin-grid"><section class="panel"><h2>Nosso encontro</h2><form id="event"><label for="date">Data</label><input id="date" name="date" type="date" value="${esc(event.date)}" required><label for="time">Horário</label><input id="time" name="time" type="time" value="${esc(event.time)}" required><label for="location">Local e endereço</label><input id="location" name="location" value="${esc(event.location)}" maxlength="500" required><button class="submit">Salvar informações</button></form></section><section class="panel"><h2>Cadastrar um mimo</h2><form id="gift"><label for="gift-name">Nome do mimo</label><input id="gift-name" name="name" required maxlength="120"><label for="image">Link da foto</label><input id="image" name="image" type="url" placeholder="https://..." required maxlength="2000"><label for="url">Link para comprar</label><input id="url" name="url" type="url" placeholder="https://..." required maxlength="2000"><label for="capacity">Quantas famílias podem escolher?</label><input id="capacity" name="capacity" type="number" min="1" max="10000" value="1" required><button class="submit">Adicionar mimo</button></form></section></div><section class="panel"><h2>Famílias e confirmações</h2><p class="empty">Fraldas por família: ${["RN", "P", "M", "G", "XG"].map((s) => `${s}: ${families.filter((f) => f.diaper === s).length}`).join(" · ")}</p>${families.length ? `<div class="table-wrap"><table><thead><tr><th>Convidado</th><th>Acompanhantes</th><th>Fralda</th><th>Mimos escolhidos</th></tr></thead><tbody>${families.map((f) => `<tr><td>${esc(f.name)}</td><td>${f.companions.map(esc).join(", ") || "Sem acompanhantes"}</td><td>${esc(f.diaper)}</td><td>${(f.giftIds || []).map((id) => esc(gifts.find((g) => g.id === id)?.name || "Mimo")).join(", ") || "Ainda não escolheu"}</td></tr>`).join("")}</tbody></table></div>` : '<p class="empty">As confirmações aparecerão aqui assim que os convidados responderem.</p>'}</section><section class="panel"><h2>Lista de mimos</h2>${gifts.length ? gifts.map((g) => `<div class="admin-gift"><div><strong>${esc(g.name)}</strong><p class="empty">${g.reserved} de ${g.capacity} reservado(s)</p></div><button class="secondary small" data-delete="${esc(g.id)}" ${g.reserved ? "disabled" : ""}>Remover</button></div>`).join("") : '<p class="empty">Cadastre os primeiros mimos acima.</p>'}</section></div>`;
+  action(document.querySelector("#event"), async (d) => {
+    await api("/admin/event", "PUT", Object.fromEntries(d));
+    notify("Informações da festa salvas.");
+  });
+  action(document.querySelector("#gift"), async (d) => {
+    await api("/admin/gifts", "POST", {
+      ...Object.fromEntries(d),
+      capacity: Number(d.get("capacity")),
+    });
+    await admin();
+    notify("Mimo adicionado!");
+  });
+  document.querySelectorAll("[data-delete]").forEach(
+    (b) =>
+      (b.onclick = async () => {
+        try {
+          await api("/admin/gifts/" + b.dataset.delete, "DELETE");
+          await admin();
+        } catch (e) {
+          notify(e.message);
+        }
+      }),
+  );
+}
+if (location.pathname === "/admin") admin();
+else {
+  const params = new URLSearchParams(location.search);
+  const id = params.has("novo")
+    ? null
+    : params.get("familia") || localStorage.getItem("benicio-family");
+  if (id && /^[a-f0-9]{48}$/.test(id)) confirmed(id);
+  else invitation();
+}
